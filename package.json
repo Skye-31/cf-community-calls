@@ -1,0 +1,105 @@
+{
+	"name": "community-call-bot",
+	"version": "0.0.0",
+	"private": true,
+	"scripts": {
+		"deploy": "wrangler publish",
+		"format": "prettier --check .",
+		"format:fix": "prettier --write . --end-of-line lf",
+		"lint": "eslint . --ext .ts --max-warnings 0",
+		"lint:fix": "eslint . --ext .ts --fix",
+		"start": "wrangler dev"
+	},
+	"eslintConfig": {
+		"parser": "@typescript-eslint/parser",
+		"parserOptions": {
+			"ecmaVersion": 2020,
+			"project": [
+				"tsconfig.json"
+			],
+			"sourceType": "module"
+		},
+		"plugins": [
+			"@typescript-eslint",
+			"import",
+			"unused-imports"
+		],
+		"extends": [
+			"eslint:recommended",
+			"plugin:@typescript-eslint/recommended"
+		],
+		"overrides": [
+			{
+				"files": [
+					"*.ts"
+				],
+				"extends": [
+					"eslint:recommended",
+					"plugin:@typescript-eslint/recommended",
+					"plugin:import/typescript"
+				],
+				"rules": {
+					"no-empty": "off",
+					"no-empty-function": "off",
+					"no-mixed-spaces-and-tabs": [
+						"error",
+						"smart-tabs"
+					],
+					"no-shadow": "off",
+					"require-yield": "off",
+					"@typescript-eslint/consistent-type-imports": [
+						"error"
+					],
+					"@typescript-eslint/no-empty-function": "off",
+					"@typescript-eslint/no-explicit-any": "error",
+					"@typescript-eslint/no-floating-promises": "error",
+					"@typescript-eslint/no-shadow": "error",
+					"@typescript-eslint/no-unused-vars": "off",
+					"import/order": [
+						"warn",
+						{
+							"groups": [
+								"builtin",
+								"external",
+								"internal",
+								"parent",
+								"sibling",
+								"index",
+								"object",
+								"type"
+							],
+							"alphabetize": {
+								"order": "asc"
+							}
+						}
+					],
+					"unused-imports/no-unused-imports": "error",
+					"unused-imports/no-unused-vars": [
+						"warn",
+						{
+							"vars": "all",
+							"varsIgnorePattern": "^_",
+							"args": "after-used",
+							"argsIgnorePattern": "^_"
+						}
+					]
+				}
+			}
+		],
+		"ignorePatterns": [],
+		"root": true
+	},
+	"devDependencies": {
+		"@cloudflare/workers-types": "^4.20221111.1",
+		"@typescript-eslint/eslint-plugin": "^5.47.0",
+		"@typescript-eslint/parser": "^5.47.0",
+		"discord-api-types": "^0.37.24",
+		"eslint": "^8.30.0",
+		"eslint-plugin-import": "^2.26.0",
+		"eslint-plugin-unused-imports": "^2.0.0",
+		"prettier": "^2.8.1",
+		"prettier-plugin-packagejson": "^2.3.0",
+		"typescript": "^4.9.4",
+		"wrangler": "2.6.2"
+	}
+}
