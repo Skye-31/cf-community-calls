@@ -298,9 +298,13 @@ export default <ExportedHandler<Env>>{
 							},
 						});
 					}
+					const message = await res.json<APIMessage>();
 					return respondToInteraction({
 						type: InteractionResponseType.ChannelMessageWithSource,
-						data: { content: "Question sent", flags: 64 },
+						data: {
+							content: `Question sent\n\n🔗 [Link](https://discord.com/channels/${interaction.guild_id}/${message.channel_id}/${message.id})`,
+							flags: 64,
+						},
 					});
 				}
 				return respondToInteraction({
