@@ -9,7 +9,7 @@ import {
 	TextInputStyle,
 } from "discord-api-types/v10";
 import { createCommands } from "./commands";
-import { GetQuestionStateFromCommandName, Unanswered } from "./question-state";
+import { GetQuestionStateFromCommandName, NeedsMoreInfo, Unanswered } from "./question-state";
 import { getState, setState } from "./state";
 import { verify } from "./verifyInteraction";
 import type {
@@ -204,7 +204,7 @@ export default <ExportedHandler<Env>>{
 								},
 							});
 						}
-						ctx.waitUntil(
+						const promises: Promise<unknown>[] = [
 							fetch(
 								`${RouteBases.api}${Routes.webhookMessage(
 									interaction.application_id,
@@ -214,7 +214,41 @@ export default <ExportedHandler<Env>>{
 								{
 									method: "DELETE",
 								}
-							).then(() => void 0)
+							),
+						];
+						if (answerState.CmdName === NeedsMoreInfo.CmdName && !message.thread) {
+							promises.push(
+								// Create a thread from this message, asking the user for more information
+								fetch(`${RouteBases.api}${Routes.threads(message.channel_id, message.id)}`, {
+									headers: {
+										Authorization: `Bot ${env.DISCORD_BOT_TOKEN}`,
+										"Content-Type": "application/json",
+									},
+									method: "POST",
+									body: JSON.stringify({
+										name: "More Information Required",
+									}),
+								}).then(async (r) => {
+									if (r.ok) {
+										// Send a message to the thread asking for more information
+										// In this case, the original message ID is the thread ID
+										await fetch(`${RouteBases.api}${Routes.channelMessages(message.id)}`, {
+											headers: {
+												Authorization: `Bot ${env.DISCORD_BOT_TOKEN}`,
+												"Content-Type": "application/json",
+											},
+											method: "POST",
+											body: JSON.stringify({
+												content: "Please provide more information about your issue.",
+											}),
+										});
+									}
+								})
+							);
+						}
+						ctx.waitUntil(
+							// We have to temporarily add `.then() => {})` to make the promise return void due to workers types being broken
+							Promise.all(promises).then(() => {})
 						);
 						return respondToInteraction({
 							type: InteractionResponseType.ChannelMessageWithSource,
