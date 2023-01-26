@@ -17,9 +17,9 @@ import type {
 	APIInteractionResponse,
 	APIApplicationCommandInteractionDataBooleanOption,
 	APIApplicationCommandInteractionDataChannelOption,
+	APIInteractionGuildMember,
 	APIMessage,
 	RESTPostAPIWebhookWithTokenJSONBody,
-	APIUser,
 } from "discord-api-types/v10";
 
 export interface Env {
@@ -60,9 +60,17 @@ export default <ExportedHandler<Env>>{
 			return new Response((err as Error).message, { status: 401 });
 		}
 
+		if (interaction.type === InteractionType.Ping) {
+			return respondToInteraction({ type: InteractionResponseType.Pong });
+		}
+		if (!interaction.guild_id || !interaction.member) {
+			return respondToInteraction({
+				type: InteractionResponseType.ChannelMessageWithSource,
+				data: { content: "Unexpected DM interaction", flags: 64 },
+			});
+		}
+
 		switch (interaction.type) {
-			case InteractionType.Ping:
-				return respondToInteraction({ type: InteractionResponseType.Pong });
 			case InteractionType.ApplicationCommand:
 				switch (interaction.data.type) {
 					case ApplicationCommandType.ChatInput:
@@ -320,7 +328,7 @@ export default <ExportedHandler<Env>>{
 								},
 							],
 							username: `${interaction.member?.user.username}#${interaction.member?.user.discriminator}`,
-							avatar_url: GetUserAvatar(interaction.member?.user as APIUser),
+							avatar_url: GetMemberAvatar(interaction.member, interaction.guild_id),
 						} as RESTPostAPIWebhookWithTokenJSONBody),
 					});
 					if (res.status !== 200) {
@@ -360,11 +368,15 @@ function respondToInteraction(body: APIInteractionResponse) {
 	});
 }
 
-function GetUserAvatar(user: APIUser) {
-	if (!user.avatar) {
+function GetMemberAvatar(member: APIInteractionGuildMember, guildId: string): string {
+	const user = member.user;
+	if (member.avatar) {
+		return `https://cdn.discordapp.com/guilds/${guildId}/users/${user.id}/avatars/${member.avatar}.png`;
+	} else if (member.user.avatar) {
+		return `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`;
+	} else {
 		return `https://cdn.discordapp.com/embed/avatars/${parseInt(user.discriminator) % 5}.png`;
 	}
-	return `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`;
 }
 
 function GetIDFromWebhook(webhook: string) {
