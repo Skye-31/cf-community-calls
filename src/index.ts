@@ -317,7 +317,7 @@ export default <ExportedHandler<Env>>{
 									color: Unanswered.Color,
 								},
 							],
-							username: `${interaction.member?.user.username}#${interaction.member?.user.discriminator}`,
+							username: interaction.member?.nick ?? `${interaction.member?.user.username}#${interaction.member?.user.discriminator}`,
 							avatar_url: GetMemberAvatar(interaction.member, interaction.guild_id),
 						} as RESTPostAPIWebhookWithTokenJSONBody),
 					});
