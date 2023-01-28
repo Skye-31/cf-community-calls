@@ -216,31 +216,17 @@ export default <ExportedHandler<Env>>{
 						];
 						if (answerState.CmdName === NeedsMoreInfo.CmdName && !message.thread) {
 							promises.push(
-								// Create a thread from this message, asking the user for more information
-								fetch(`${RouteBases.api}${Routes.threads(message.channel_id, message.id)}`, {
+								// Send a message to the thread asking for more information
+								// In this case, the original message ID is the thread ID
+								fetch(`${RouteBases.api}${Routes.channelMessages(message.id)}`, {
 									headers: {
 										Authorization: `Bot ${env.DISCORD_BOT_TOKEN}`,
 										"Content-Type": "application/json",
 									},
 									method: "POST",
 									body: JSON.stringify({
-										name: "More Information Required",
+										content: "Please provide more information about your issue.",
 									}),
-								}).then(async (r) => {
-									if (r.ok) {
-										// Send a message to the thread asking for more information
-										// In this case, the original message ID is the thread ID
-										await fetch(`${RouteBases.api}${Routes.channelMessages(message.id)}`, {
-											headers: {
-												Authorization: `Bot ${env.DISCORD_BOT_TOKEN}`,
-												"Content-Type": "application/json",
-											},
-											method: "POST",
-											body: JSON.stringify({
-												content: "Please provide more information about your issue.",
-											}),
-										});
-									}
 								})
 							);
 						}
@@ -331,7 +317,20 @@ export default <ExportedHandler<Env>>{
 						});
 					}
 					const message = await res.json<APIMessage>();
-					const lastModalMessage = await getDOState(env.ChannelDO);
+					const [, lastModalMessage] = await Promise.all([
+						// Create a thread from this message, asking the user for more information
+						fetch(`${RouteBases.api}${Routes.threads(message.channel_id, message.id)}`, {
+							headers: {
+								Authorization: `Bot ${env.DISCORD_BOT_TOKEN}`,
+								"Content-Type": "application/json",
+							},
+							method: "POST",
+							body: JSON.stringify({
+								name: question.substring(0, 17) + "...",
+							}),
+						}),
+						getDOState(env.ChannelDO)
+					]);
 					if (lastModalMessage) {
 						await deleteMessage(
 							env.DISCORD_QUESTION_CHANNEL,
