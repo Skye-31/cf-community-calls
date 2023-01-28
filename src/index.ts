@@ -45,7 +45,7 @@ export default <ExportedHandler<Env>>{
 						.catch((err) => new Response((err as Error).message, { status: 500 }));
 				}
 			}
-		} catch {}
+		} catch { }
 
 		const unverifiedResponse = new Response("Missing signature", {
 			status: 401,
@@ -81,8 +81,8 @@ export default <ExportedHandler<Env>>{
 							case "questions": {
 								const open = !!(
 									interaction.data.options?.find((x) => x.name === "open") as
-										| APIApplicationCommandInteractionDataBooleanOption
-										| undefined
+									| APIApplicationCommandInteractionDataBooleanOption
+									| undefined
 								)?.value;
 
 								const state = await getKVState(env.Settings);
@@ -98,8 +98,8 @@ export default <ExportedHandler<Env>>{
 								if (open) {
 									const announcement = (
 										interaction.data.options?.find((x) => x.name === "announcement-channel") as
-											| APIApplicationCommandInteractionDataChannelOption
-											| undefined
+										| APIApplicationCommandInteractionDataChannelOption
+										| undefined
 									)?.value;
 									if (!announcement) {
 										return respondToInteraction({
@@ -107,11 +107,10 @@ export default <ExportedHandler<Env>>{
 											data: { content: "Please provide an announcement channel", flags: 64 },
 										});
 									}
-									const message = await sendModalMessage(announcement, env.DISCORD_BOT_TOKEN);
-									const qMessage = await sendModalMessage(
+									const [message, qMessage] = await Promise.all([sendModalMessage(announcement, env.DISCORD_BOT_TOKEN), sendModalMessage(
 										env.DISCORD_QUESTION_CHANNEL,
 										env.DISCORD_BOT_TOKEN
-									);
+									)]);
 									if (!message.ok) {
 										return respondToInteraction({
 											type: InteractionResponseType.ChannelMessageWithSource,
@@ -125,7 +124,7 @@ export default <ExportedHandler<Env>>{
 										return respondToInteraction({
 											type: InteractionResponseType.ChannelMessageWithSource,
 											data: {
-												content: `Failed to send in question channel, received: ${message.status} ${message.statusText}`,
+												content: `Failed to send in question channel, received: ${qMessage.status} ${qMessage.statusText}`,
 												flags: 64,
 											},
 										});
@@ -247,7 +246,7 @@ export default <ExportedHandler<Env>>{
 						}
 						ctx.waitUntil(
 							// We have to temporarily add `.then() => {})` to make the promise return void due to workers types being broken
-							Promise.all(promises).then(() => {})
+							Promise.all(promises).then(() => { })
 						);
 						return respondToInteraction({
 							type: InteractionResponseType.ChannelMessageWithSource,
@@ -335,8 +334,8 @@ export default <ExportedHandler<Env>>{
 					const lastModalMessage = await getDOState(env.ChannelDO);
 					if (lastModalMessage) {
 						await deleteMessage(
-							lastModalMessage,
 							env.DISCORD_QUESTION_CHANNEL,
+							lastModalMessage,
 							env.DISCORD_BOT_TOKEN
 						);
 					}

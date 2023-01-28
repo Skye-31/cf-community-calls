@@ -1,7 +1,7 @@
 import { Routes, RouteBases, ButtonStyle, ComponentType } from "discord-api-types/v10";
 
 async function deleteMessage(channelId: string, messageId: string, token: string) {
-	await fetch(`${RouteBases.api}${Routes.channelMessage(channelId, messageId)}`, {
+	return await fetch(`${RouteBases.api}${Routes.channelMessage(channelId, messageId)}`, {
 		method: "DELETE",
 		headers: {
 			Authorization: `Bot ${token}`,
