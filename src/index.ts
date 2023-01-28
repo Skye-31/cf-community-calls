@@ -5,12 +5,12 @@ import {
 	RouteBases,
 	Routes,
 	ComponentType,
-	ButtonStyle,
 	TextInputStyle,
 } from "discord-api-types/v10";
 import { createCommands } from "./commands";
+import { sendModalMessage, deleteMessage } from "./messages";
 import { GetQuestionStateFromCommandName, NeedsMoreInfo, Unanswered } from "./question-state";
-import { getState, setState } from "./state";
+import { getKVState, setKVState, DOState, getDOState, setDOState, deleteDOState } from "./state";
 import { verify } from "./verifyInteraction";
 import type {
 	APIInteraction,
@@ -27,9 +27,12 @@ export interface Env {
 	DISCORD_PUBLIC_KEY: string;
 	DISCORD_BOT_TOKEN: string;
 	DISCORD_QUESTIONS_WEBHOOK: string;
-
+	DISCORD_QUESTION_CHANNEL: string;
+	ChannelDO: DurableObjectNamespace;
 	Settings: KVNamespace;
 }
+
+export { DOState };
 
 export default <ExportedHandler<Env>>{
 	async fetch(request, env, ctx): Promise<Response> {
@@ -82,7 +85,7 @@ export default <ExportedHandler<Env>>{
 										| undefined
 								)?.value;
 
-								const state = await getState(env.Settings);
+								const state = await getKVState(env.Settings);
 								if (state.open === open) {
 									return respondToInteraction({
 										type: InteractionResponseType.ChannelMessageWithSource,
@@ -104,34 +107,10 @@ export default <ExportedHandler<Env>>{
 											data: { content: "Please provide an announcement channel", flags: 64 },
 										});
 									}
-									const message = await fetch(
-										`${RouteBases.api}${Routes.channelMessages(announcement)}`,
-										{
-											headers: {
-												Authorization: `Bot ${env.DISCORD_BOT_TOKEN}`,
-												"Content-Type": "application/json",
-											},
-											method: "POST",
-											body: JSON.stringify({
-												content: "Questions are now open! Ask away!",
-												components: [
-													{
-														type: ComponentType.ActionRow,
-														components: [
-															{
-																type: ComponentType.Button,
-																label: "Ask a question",
-																style: ButtonStyle.Primary,
-																custom_id: "ask-question",
-																emoji: {
-																	name: "❓",
-																},
-															},
-														],
-													},
-												],
-											} as APIMessage),
-										}
+									const message = await sendModalMessage(announcement, env.DISCORD_BOT_TOKEN);
+									const qMessage = await sendModalMessage(
+										env.DISCORD_QUESTION_CHANNEL,
+										env.DISCORD_BOT_TOKEN
 									);
 									if (!message.ok) {
 										return respondToInteraction({
@@ -142,30 +121,42 @@ export default <ExportedHandler<Env>>{
 											},
 										});
 									}
+									if (!qMessage.ok) {
+										return respondToInteraction({
+											type: InteractionResponseType.ChannelMessageWithSource,
+											data: {
+												content: `Failed to send in question channel, received: ${message.status} ${message.statusText}`,
+												flags: 64,
+											},
+										});
+									}
+									await setDOState(env.ChannelDO, (await qMessage.json<APIMessage>()).id);
 									state.announcement = {
 										channelId: announcement,
 										messageId: (await message.json<APIMessage>()).id,
 									};
 								} else {
 									if (state.announcement) {
-										await fetch(
-											`${RouteBases.api}${Routes.channelMessages(state.announcement.channelId)}/${
-												state.announcement.messageId
-											}`,
-											{
-												headers: {
-													Authorization: `Bot ${env.DISCORD_BOT_TOKEN}`,
-													"Content-Type": "application/json",
-												},
-												method: "DELETE",
-											}
+										await deleteMessage(
+											state.announcement.channelId,
+											state.announcement.messageId,
+											env.DISCORD_BOT_TOKEN
 										);
 									}
 									state.announcement = undefined;
+									const questionId = await getDOState(env.ChannelDO);
+									if (questionId) {
+										await deleteMessage(
+											env.DISCORD_QUESTION_CHANNEL,
+											questionId,
+											env.DISCORD_BOT_TOKEN
+										);
+									}
+									ctx.waitUntil(deleteDOState(env.ChannelDO));
 								}
 
 								state.open = open;
-								ctx.waitUntil(setState(env.Settings, state));
+								ctx.waitUntil(setKVState(env.Settings, state));
 
 								return respondToInteraction({
 									type: InteractionResponseType.ChannelMessageWithSource,
@@ -307,7 +298,7 @@ export default <ExportedHandler<Env>>{
 			case InteractionType.ModalSubmit:
 				if (interaction.data.custom_id === "ask-question-modal") {
 					const question = interaction.data.components[0].components[0].value;
-					const state = await getState(env.Settings);
+					const state = await getKVState(env.Settings);
 					if (!state.open) {
 						return respondToInteraction({
 							type: InteractionResponseType.ChannelMessageWithSource,
@@ -341,6 +332,19 @@ export default <ExportedHandler<Env>>{
 						});
 					}
 					const message = await res.json<APIMessage>();
+					const lastModalMessage = await getDOState(env.ChannelDO);
+					if (lastModalMessage) {
+						await deleteMessage(
+							lastModalMessage,
+							env.DISCORD_QUESTION_CHANNEL,
+							env.DISCORD_BOT_TOKEN
+						);
+					}
+					const modalMessage = await sendModalMessage(
+						env.DISCORD_QUESTION_CHANNEL,
+						env.DISCORD_BOT_TOKEN
+					);
+					await setDOState(env.ChannelDO, (await modalMessage.json<APIMessage>()).id);
 					return respondToInteraction({
 						type: InteractionResponseType.ChannelMessageWithSource,
 						data: {
