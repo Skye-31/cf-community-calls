@@ -214,7 +214,7 @@ export default <ExportedHandler<Env>>{
 								}
 							),
 						];
-						if (answerState.CmdName === NeedsMoreInfo.CmdName && !message.thread) {
+						if (answerState.CmdName === NeedsMoreInfo.CmdName) {
 							promises.push(
 								// Send a message to the thread asking for more information
 								// In this case, the original message ID is the thread ID
@@ -225,7 +225,7 @@ export default <ExportedHandler<Env>>{
 									},
 									method: "POST",
 									body: JSON.stringify({
-										content: "Please provide more information about your issue.",
+										content: `Please provide more information about your question here.`,
 									}),
 								})
 							);
