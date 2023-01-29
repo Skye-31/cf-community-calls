@@ -4,7 +4,7 @@ compatibility_date = "2022-12-26"
 account_id = "db47db45acd22a503f31e76887a98caa"
 
 durable_objects.bindings = [
-  { name = "ChannelDO", class_name = "DOState" }
+  { name = "StateManager", class_name = "StateManager" }
 ]
 
 [vars]
@@ -14,12 +14,7 @@ DISCORD_QUESTION_CHANNEL = "1067184198206640188"
 
 [[migrations]]
 tag = "one"
-new_classes = ["DOState"]
-
-[[kv_namespaces]]
-binding = "Settings"
-id = "fb89bffc17f84ea9830235274da40fd5"
-preview_id = "fb89bffc17f84ea9830235274da40fd5"
+new_classes = ["StateManager"]
 
 # [secrets]
 # DISCORD_BOT_TOKEN - this is used for setting commands, as well as posting announcements for questions

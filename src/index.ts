@@ -10,7 +10,7 @@ import {
 import { createCommands } from "./commands";
 import { sendModalMessage, deleteMessage } from "./messages";
 import { GetQuestionStateFromCommandName, NeedsMoreInfo, Unanswered } from "./question-state";
-import { getKVState, setKVState, DOState, getDOState, setDOState, deleteDOState } from "./state";
+import { getState, setState, StateManager } from "./state";
 import { verify } from "./verifyInteraction";
 import type {
 	APIInteraction,
@@ -28,11 +28,10 @@ export interface Env {
 	DISCORD_BOT_TOKEN: string;
 	DISCORD_QUESTIONS_WEBHOOK: string;
 	DISCORD_QUESTION_CHANNEL: string;
-	ChannelDO: DurableObjectNamespace;
-	Settings: KVNamespace;
+	StateManager: DurableObjectNamespace;
 }
 
-export { DOState };
+export { StateManager };
 
 export default <ExportedHandler<Env>>{
 	async fetch(request, env, ctx): Promise<Response> {
@@ -85,7 +84,7 @@ export default <ExportedHandler<Env>>{
 									| undefined
 								)?.value;
 
-								const state = await getKVState(env.Settings);
+								const state = await getState(env.StateManager);
 								if (state.open === open) {
 									return respondToInteraction({
 										type: InteractionResponseType.ChannelMessageWithSource,
@@ -121,9 +120,7 @@ export default <ExportedHandler<Env>>{
 										});
 									}
 									if (qMessage.ok) {
-										await setDOState(env.ChannelDO, (await qMessage.json<APIMessage>()).id);
-									} else {
-										console.error(`Failed to send in question channel, received: ${qMessage.status} ${qMessage.statusText}`);
+										state.questionChannelMessageId = (await qMessage.json<APIMessage>()).id;
 									}
 									state.announcement = {
 										channelId: announcement,
@@ -138,19 +135,18 @@ export default <ExportedHandler<Env>>{
 										);
 									}
 									state.announcement = undefined;
-									const questionId = await getDOState(env.ChannelDO);
-									if (questionId) {
+									if (state.questionChannelMessageId) {
 										await deleteMessage(
 											env.DISCORD_QUESTION_CHANNEL,
-											questionId,
+											state.questionChannelMessageId,
 											env.DISCORD_BOT_TOKEN
 										);
-										ctx.waitUntil(deleteDOState(env.ChannelDO));
+										state.questionChannelMessageId = undefined;
 									}
 								}
 
 								state.open = open;
-								ctx.waitUntil(setKVState(env.Settings, state));
+								ctx.waitUntil(setState(env.StateManager, state));
 
 								return respondToInteraction({
 									type: InteractionResponseType.ChannelMessageWithSource,
@@ -292,17 +288,18 @@ export default <ExportedHandler<Env>>{
 				});
 			case InteractionType.ModalSubmit:
 				if (interaction.data.custom_id === "ask-question-modal") {
-					const components = interaction.data.components[0];
-					const { question, threadName } = components.components.reduce((a, b) => {
-						if (b.custom_id === "ask-question-input") {
-							a.question = b.value;
+					const components = interaction.data.components;
+					const { question, threadName } = components.reduce((a, b) => {
+						const subComponent = b.components[0];
+						if (subComponent.custom_id === "ask-question-input") {
+							a.question = subComponent.value;
 						}
-						if (b.custom_id === "thread-name-input") {
-							a.threadName = b.value;
+						if (subComponent.custom_id === "thread-name-input") {
+							a.threadName = subComponent.value;
 						}
 						return a;
 					}, {} as { question: string, threadName: string });
-					const state = await getKVState(env.Settings);
+					const state = await getState(env.StateManager);
 					if (!state.open) {
 						return respondToInteraction({
 							type: InteractionResponseType.ChannelMessageWithSource,
@@ -336,20 +333,17 @@ export default <ExportedHandler<Env>>{
 						});
 					}
 					const message = await res.json<APIMessage>();
-					const [thread, lastModalMessage] = await Promise.all([
-						// Create a thread from this message, asking the user for more information
-						fetch(`${RouteBases.api}${Routes.threads(message.channel_id, message.id)}`, {
-							headers: {
-								Authorization: `Bot ${env.DISCORD_BOT_TOKEN}`,
-								"Content-Type": "application/json",
-							},
-							method: "POST",
-							body: JSON.stringify({
-								name: threadName ?? question.substring(0, 17) + "...",
-							}),
+					// Create a thread from this message, asking the user for more information
+					const thread = await fetch(`${RouteBases.api}${Routes.threads(message.channel_id, message.id)}`, {
+						headers: {
+							Authorization: `Bot ${env.DISCORD_BOT_TOKEN}`,
+							"Content-Type": "application/json",
+						},
+						method: "POST",
+						body: JSON.stringify({
+							name: threadName ?? question.substring(0, 17) + "...",
 						}),
-						getDOState(env.ChannelDO)
-					]);
+					});
 					const promises = [];
 					if (thread.ok) {
 						promises.push(fetch(`${RouteBases.api}${Routes.channelMessages(message.id)}`, {
@@ -363,10 +357,10 @@ export default <ExportedHandler<Env>>{
 							}),
 						}));
 					}
-					if (lastModalMessage) {
+					if (state.questionChannelMessageId) {
 						promises.push(deleteMessage(
 							env.DISCORD_QUESTION_CHANNEL,
-							lastModalMessage,
+							state.questionChannelMessageId,
 							env.DISCORD_BOT_TOKEN
 						));
 					}
@@ -376,8 +370,9 @@ export default <ExportedHandler<Env>>{
 						env.DISCORD_BOT_TOKEN
 					);
 					if (modalMessage.ok) {
-						await setDOState(env.ChannelDO, (await modalMessage.json<APIMessage>()).id);
+						state.questionChannelMessageId = (await modalMessage.json<APIMessage>()).id;
 					}
+					await setState(env.StateManager, state);
 					return respondToInteraction({
 						type: InteractionResponseType.ChannelMessageWithSource,
 						data: {
