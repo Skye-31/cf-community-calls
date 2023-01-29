@@ -120,16 +120,11 @@ export default <ExportedHandler<Env>>{
 											},
 										});
 									}
-									if (!qMessage.ok) {
-										return respondToInteraction({
-											type: InteractionResponseType.ChannelMessageWithSource,
-											data: {
-												content: `Failed to send in question channel, received: ${qMessage.status} ${qMessage.statusText}`,
-												flags: 64,
-											},
-										});
+									if (qMessage.ok) {
+										await setDOState(env.ChannelDO, (await qMessage.json<APIMessage>()).id);
+									} else {
+										console.error(`Failed to send in question channel, received: ${qMessage.status} ${qMessage.statusText}`);
 									}
-									await setDOState(env.ChannelDO, (await qMessage.json<APIMessage>()).id);
 									state.announcement = {
 										channelId: announcement,
 										messageId: (await message.json<APIMessage>()).id,
@@ -150,8 +145,8 @@ export default <ExportedHandler<Env>>{
 											questionId,
 											env.DISCORD_BOT_TOKEN
 										);
+										ctx.waitUntil(deleteDOState(env.ChannelDO));
 									}
-									ctx.waitUntil(deleteDOState(env.ChannelDO));
 								}
 
 								state.open = open;
@@ -225,7 +220,7 @@ export default <ExportedHandler<Env>>{
 									},
 									method: "POST",
 									body: JSON.stringify({
-										content: `Please provide more information about your question here.`,
+										content: "Please provide more information about your question here.",
 									}),
 								})
 							);
@@ -272,6 +267,21 @@ export default <ExportedHandler<Env>>{
 										},
 									],
 								},
+								{
+									type: ComponentType.ActionRow,
+									components: [
+										{
+											type: ComponentType.TextInput,
+											style: TextInputStyle.Paragraph,
+											custom_id: "thread-name-input",
+											label: "Thread name",
+											placeholder: "What should I name your discussion thread?",
+											min_length: 5,
+											max_length: 20,
+											required: false,
+										},
+									],
+								}
 							],
 						},
 					});
@@ -282,7 +292,16 @@ export default <ExportedHandler<Env>>{
 				});
 			case InteractionType.ModalSubmit:
 				if (interaction.data.custom_id === "ask-question-modal") {
-					const question = interaction.data.components[0].components[0].value;
+					const components = interaction.data.components[0];
+					const { question, threadName } = components.components.reduce((a, b) => {
+						if (b.custom_id === "ask-question-input") {
+							a.question = b.value;
+						}
+						if (b.custom_id === "thread-name-input") {
+							a.threadName = b.value;
+						}
+						return a;
+					}, {} as { question: string, threadName: string });
 					const state = await getKVState(env.Settings);
 					if (!state.open) {
 						return respondToInteraction({
@@ -317,7 +336,7 @@ export default <ExportedHandler<Env>>{
 						});
 					}
 					const message = await res.json<APIMessage>();
-					const [, lastModalMessage] = await Promise.all([
+					const [thread, lastModalMessage] = await Promise.all([
 						// Create a thread from this message, asking the user for more information
 						fetch(`${RouteBases.api}${Routes.threads(message.channel_id, message.id)}`, {
 							headers: {
@@ -326,23 +345,39 @@ export default <ExportedHandler<Env>>{
 							},
 							method: "POST",
 							body: JSON.stringify({
-								name: question.substring(0, 17) + "...",
+								name: threadName ?? question.substring(0, 17) + "...",
 							}),
 						}),
 						getDOState(env.ChannelDO)
 					]);
+					const promises = [];
+					if (thread.ok) {
+						promises.push(fetch(`${RouteBases.api}${Routes.channelMessages(message.id)}`, {
+							headers: {
+								Authorization: `Bot ${env.DISCORD_BOT_TOKEN}`,
+								"Content-Type": "application/json",
+							},
+							method: "POST",
+							body: JSON.stringify({
+								content: `Question posted by: <@${interaction.member?.user.id}>`,
+							}),
+						}));
+					}
 					if (lastModalMessage) {
-						await deleteMessage(
+						promises.push(deleteMessage(
 							env.DISCORD_QUESTION_CHANNEL,
 							lastModalMessage,
 							env.DISCORD_BOT_TOKEN
-						);
+						));
 					}
+					await Promise.all(promises);
 					const modalMessage = await sendModalMessage(
 						env.DISCORD_QUESTION_CHANNEL,
 						env.DISCORD_BOT_TOKEN
 					);
-					await setDOState(env.ChannelDO, (await modalMessage.json<APIMessage>()).id);
+					if (modalMessage.ok) {
+						await setDOState(env.ChannelDO, (await modalMessage.json<APIMessage>()).id);
+					}
 					return respondToInteraction({
 						type: InteractionResponseType.ChannelMessageWithSource,
 						data: {
