@@ -44,7 +44,7 @@ export default <ExportedHandler<Env>>{
 						.catch((err) => new Response((err as Error).message, { status: 500 }));
 				}
 			}
-		} catch { }
+		} catch {}
 
 		const unverifiedResponse = new Response("Missing signature", {
 			status: 401,
@@ -80,8 +80,8 @@ export default <ExportedHandler<Env>>{
 							case "questions": {
 								const open = !!(
 									interaction.data.options?.find((x) => x.name === "open") as
-									| APIApplicationCommandInteractionDataBooleanOption
-									| undefined
+										| APIApplicationCommandInteractionDataBooleanOption
+										| undefined
 								)?.value;
 
 								const state = await getState(env.StateManager);
@@ -97,8 +97,8 @@ export default <ExportedHandler<Env>>{
 								if (open) {
 									const announcement = (
 										interaction.data.options?.find((x) => x.name === "announcement-channel") as
-										| APIApplicationCommandInteractionDataChannelOption
-										| undefined
+											| APIApplicationCommandInteractionDataChannelOption
+											| undefined
 									)?.value;
 									if (!announcement) {
 										return respondToInteraction({
@@ -106,10 +106,10 @@ export default <ExportedHandler<Env>>{
 											data: { content: "Please provide an announcement channel", flags: 64 },
 										});
 									}
-									const [message, qMessage] = await Promise.all([sendModalMessage(announcement, env.DISCORD_BOT_TOKEN), sendModalMessage(
-										env.DISCORD_QUESTION_CHANNEL,
-										env.DISCORD_BOT_TOKEN
-									)]);
+									const [message, qMessage] = await Promise.all([
+										sendModalMessage(announcement, env.DISCORD_BOT_TOKEN),
+										sendModalMessage(env.DISCORD_QUESTION_CHANNEL, env.DISCORD_BOT_TOKEN),
+									]);
 									if (!message.ok) {
 										return respondToInteraction({
 											type: InteractionResponseType.ChannelMessageWithSource,
@@ -205,7 +205,11 @@ export default <ExportedHandler<Env>>{
 								}
 							),
 						];
-						if (answerState.CmdName === NeedsMoreInfo.CmdName) {
+						if (
+							answerState.CmdName === NeedsMoreInfo.CmdName &&
+							answerState.CmdName !== message.embeds[0].title &&
+							message.thread
+						) {
 							promises.push(
 								// Send a message to the thread asking for more information
 								// In this case, the original message ID is the thread ID
@@ -223,7 +227,7 @@ export default <ExportedHandler<Env>>{
 						}
 						ctx.waitUntil(
 							// We have to temporarily add `.then() => {})` to make the promise return void due to workers types being broken
-							Promise.all(promises).then(() => { })
+							Promise.all(promises).then(() => {})
 						);
 						return respondToInteraction({
 							type: InteractionResponseType.ChannelMessageWithSource,
@@ -255,11 +259,12 @@ export default <ExportedHandler<Env>>{
 										{
 											type: ComponentType.TextInput,
 											style: TextInputStyle.Paragraph,
-											custom_id: "ask-question-input",
-											label: "Question",
-											placeholder: "What is your question?",
-											min_length: 20,
-											max_length: 1800,
+											custom_id: "thread-name-input",
+											label: "Thread name",
+											placeholder: "What should I name your discussion thread?",
+											min_length: 5,
+											max_length: 20,
+											required: false,
 										},
 									],
 								},
@@ -269,15 +274,14 @@ export default <ExportedHandler<Env>>{
 										{
 											type: ComponentType.TextInput,
 											style: TextInputStyle.Paragraph,
-											custom_id: "thread-name-input",
-											label: "Thread name",
-											placeholder: "What should I name your discussion thread?",
-											min_length: 5,
-											max_length: 20,
-											required: false,
+											custom_id: "ask-question-input",
+											label: "Question",
+											placeholder: "What is your question?",
+											min_length: 20,
+											max_length: 1800,
 										},
 									],
-								}
+								},
 							],
 						},
 					});
@@ -298,7 +302,7 @@ export default <ExportedHandler<Env>>{
 							a.threadName = subComponent.value;
 						}
 						return a;
-					}, {} as { question: string, threadName: string });
+					}, {} as { question: string; threadName: string });
 					const state = await getState(env.StateManager);
 					if (!state.open) {
 						return respondToInteraction({
@@ -319,7 +323,9 @@ export default <ExportedHandler<Env>>{
 									color: Unanswered.Color,
 								},
 							],
-							username: interaction.member?.nick ?? `${interaction.member?.user.username}#${interaction.member?.user.discriminator}`,
+							username:
+								interaction.member?.nick ??
+								`${interaction.member?.user.username}#${interaction.member?.user.discriminator}`,
 							avatar_url: GetMemberAvatar(interaction.member, interaction.guild_id),
 						} as RESTPostAPIWebhookWithTokenJSONBody),
 					});
@@ -334,35 +340,42 @@ export default <ExportedHandler<Env>>{
 					}
 					const message = await res.json<APIMessage>();
 					// Create a thread from this message, asking the user for more information
-					const thread = await fetch(`${RouteBases.api}${Routes.threads(message.channel_id, message.id)}`, {
-						headers: {
-							Authorization: `Bot ${env.DISCORD_BOT_TOKEN}`,
-							"Content-Type": "application/json",
-						},
-						method: "POST",
-						body: JSON.stringify({
-							name: threadName ?? question.substring(0, 17) + "...",
-						}),
-					});
-					const promises = [];
-					if (thread.ok) {
-						promises.push(fetch(`${RouteBases.api}${Routes.channelMessages(message.id)}`, {
+					const thread = await fetch(
+						`${RouteBases.api}${Routes.threads(message.channel_id, message.id)}`,
+						{
 							headers: {
 								Authorization: `Bot ${env.DISCORD_BOT_TOKEN}`,
 								"Content-Type": "application/json",
 							},
 							method: "POST",
 							body: JSON.stringify({
-								content: `Question posted by: <@${interaction.member?.user.id}>`,
+								name: threadName ?? question.substring(0, 17) + "...",
 							}),
-						}));
+						}
+					);
+					const promises = [];
+					if (thread.ok) {
+						promises.push(
+							fetch(
+								`${RouteBases.api}${Routes.threadMembers(message.id, interaction.member.user.id)}`,
+								{
+									headers: {
+										Authorization: `Bot ${env.DISCORD_BOT_TOKEN}`,
+										"Content-Type": "application/json",
+									},
+									method: "PUT",
+								}
+							)
+						);
 					}
 					if (state.questionChannelMessageId) {
-						promises.push(deleteMessage(
-							env.DISCORD_QUESTION_CHANNEL,
-							state.questionChannelMessageId,
-							env.DISCORD_BOT_TOKEN
-						));
+						promises.push(
+							deleteMessage(
+								env.DISCORD_QUESTION_CHANNEL,
+								state.questionChannelMessageId,
+								env.DISCORD_BOT_TOKEN
+							)
+						);
 					}
 					await Promise.all(promises);
 					const modalMessage = await sendModalMessage(

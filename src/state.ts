@@ -5,7 +5,7 @@ export interface State {
 		messageId: string;
 		channelId: string;
 	};
-};
+}
 
 class StateManager {
 	private readonly durableState: DurableObjectState;
@@ -25,7 +25,7 @@ class StateManager {
 				}
 				return new Response(JSON.stringify(this.state));
 			case "PUT":
-				this.durableState.blockConcurrencyWhile(async () => {
+				await this.durableState.blockConcurrencyWhile(async () => {
 					this.state = await req.json<State>();
 					await this.durableState.storage.put("state", this.state);
 				});
@@ -37,11 +37,13 @@ class StateManager {
 }
 
 async function getState(ChannelDO: DurableObjectNamespace): Promise<State> {
-	return await (
-		await ChannelDO.get(ChannelDO.idFromName("DOState")).fetch("https://do.state", {
+	const doResponse = await ChannelDO.get(ChannelDO.idFromName("DOState")).fetch(
+		"https://do.state",
+		{
 			method: "GET",
-		})
-	).json<State>();
+		}
+	);
+	return await doResponse.json<State>();
 }
 
 async function setState(ChannelDO: DurableObjectNamespace, state: State) {
