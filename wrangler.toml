@@ -3,14 +3,18 @@ main = "src/index.ts"
 compatibility_date = "2022-12-26"
 account_id = "db47db45acd22a503f31e76887a98caa"
 
+durable_objects.bindings = [
+  { name = "StateManager", class_name = "StateManager" }
+]
+
 [vars]
 DISCORD_APPLICATION_ID = "1056871531894034492"
 DISCORD_PUBLIC_KEY = "dabf0b0d062af6d1a4ab28fa5499984e3ef5e09b662f8e1fdb75cf232aa1136c"
+DISCORD_QUESTION_CHANNEL = "1056895141664784444"
 
-[[kv_namespaces]]
-binding = "Settings"
-id = "fb89bffc17f84ea9830235274da40fd5"
-preview_id = "fb89bffc17f84ea9830235274da40fd5"
+[[migrations]]
+tag = "one"
+new_classes = ["StateManager"]
 
 # [secrets]
 # DISCORD_BOT_TOKEN - this is used for setting commands, as well as posting announcements for questions
