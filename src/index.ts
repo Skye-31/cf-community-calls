@@ -207,7 +207,7 @@ export default <ExportedHandler<Env>>{
 						];
 						if (
 							answerState.CmdName === NeedsMoreInfo.CmdName &&
-							answerState.CmdName !== message.embeds[0].title &&
+							answerState.Title !== message.embeds[0].title &&
 							message.thread
 						) {
 							promises.push(
@@ -349,7 +349,7 @@ export default <ExportedHandler<Env>>{
 							},
 							method: "POST",
 							body: JSON.stringify({
-								name: threadName ?? question.substring(0, 17) + "...",
+								name: threadName || question.substring(0, 17) + "...",
 							}),
 						}
 					);

@@ -17,7 +17,7 @@ async function sendModalMessage(channelId: string, token: string) {
 			"Content-Type": "application/json",
 		},
 		body: JSON.stringify({
-			content: "Questions are now open! Ask away!",
+			content: "Submit Questions Here:",
 			components: [
 				{
 					type: ComponentType.ActionRow,
