@@ -3,6 +3,7 @@
 	"version": "0.0.0",
 	"private": true,
 	"scripts": {
+		"build": "wrangler publish --dry-run --outdir dist",
 		"deploy": "wrangler publish",
 		"format": "prettier --check .",
 		"format:fix": "prettier --write . --end-of-line lf",
