@@ -16,7 +16,6 @@ import type {
 	APIInteraction,
 	APIInteractionResponse,
 	APIApplicationCommandInteractionDataBooleanOption,
-	APIApplicationCommandInteractionDataChannelOption,
 	APIInteractionGuildMember,
 	APIMessage,
 	RESTPostAPIWebhookWithTokenJSONBody,
@@ -95,21 +94,10 @@ export default <ExportedHandler<Env>>{
 									});
 								}
 								if (open) {
-									const announcement = (
-										interaction.data.options?.find((x) => x.name === "announcement-channel") as
-											| APIApplicationCommandInteractionDataChannelOption
-											| undefined
-									)?.value;
-									if (!announcement) {
-										return respondToInteraction({
-											type: InteractionResponseType.ChannelMessageWithSource,
-											data: { content: "Please provide an announcement channel", flags: 64 },
-										});
-									}
-									const [message, qMessage] = await Promise.all([
-										sendModalMessage(announcement, env.DISCORD_BOT_TOKEN),
-										sendModalMessage(env.DISCORD_QUESTION_CHANNEL, env.DISCORD_BOT_TOKEN),
-									]);
+									const message = await sendModalMessage(
+										env.DISCORD_QUESTION_CHANNEL,
+										env.DISCORD_BOT_TOKEN
+									);
 									if (!message.ok) {
 										return respondToInteraction({
 											type: InteractionResponseType.ChannelMessageWithSource,
@@ -119,30 +107,14 @@ export default <ExportedHandler<Env>>{
 											},
 										});
 									}
-									if (qMessage.ok) {
-										state.questionChannelMessageId = (await qMessage.json<APIMessage>()).id;
-									}
-									state.announcement = {
-										channelId: announcement,
-										messageId: (await message.json<APIMessage>()).id,
-									};
-								} else {
-									if (state.announcement) {
-										await deleteMessage(
-											state.announcement.channelId,
-											state.announcement.messageId,
-											env.DISCORD_BOT_TOKEN
-										);
-									}
-									state.announcement = undefined;
-									if (state.questionChannelMessageId) {
-										await deleteMessage(
-											env.DISCORD_QUESTION_CHANNEL,
-											state.questionChannelMessageId,
-											env.DISCORD_BOT_TOKEN
-										);
-										state.questionChannelMessageId = undefined;
-									}
+									state.questionChannelMessageId = (await message.json<APIMessage>()).id;
+								} else if (state.questionChannelMessageId) {
+									await deleteMessage(
+										env.DISCORD_QUESTION_CHANNEL,
+										state.questionChannelMessageId,
+										env.DISCORD_BOT_TOKEN
+									);
+									state.questionChannelMessageId = undefined;
 								}
 
 								state.open = open;

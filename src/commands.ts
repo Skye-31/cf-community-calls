@@ -1,7 +1,6 @@
 import {
 	ApplicationCommandOptionType,
 	ApplicationCommandType,
-	ChannelType,
 	PermissionFlagsBits,
 	RouteBases,
 	Routes,
@@ -24,12 +23,6 @@ const commands: ApplicationCommandCreate[] = [
 				description: "Open the Questions channel",
 				type: ApplicationCommandOptionType.Boolean,
 				required: true,
-			},
-			{
-				name: "announcement-channel",
-				description: "The channel to send the announcement in",
-				type: ApplicationCommandOptionType.Channel,
-				channel_types: [ChannelType.GuildText, ChannelType.GuildAnnouncement],
 			},
 		],
 		default_member_permissions: ManageMessages,

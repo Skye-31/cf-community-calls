@@ -1,10 +1,6 @@
 export interface State {
 	open: boolean;
 	questionChannelMessageId?: string;
-	announcement?: {
-		messageId: string;
-		channelId: string;
-	};
 }
 
 class StateManager {
