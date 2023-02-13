@@ -19,7 +19,7 @@ You should edit wrangler.toml with the following values:
 - `account_id`: Your Cloudflare account ID (found in the UUID in the top right of the Cloudflare dashboard)
 - `DISCORD_APPLICATION_ID`: The ID of your Discord application (found in the General Information tab of your Discord application)
 - `DISCORD_PUBLIC_KEY`: The public key of your Discord application (found slightly lower than the above ID)
-- `DISCORD_QUESTIONS_CHANNEL`: The channel to send the questions button to
+- `DISCORD_QUESTION_CHANNEL`: The channel to send the questions button to
 
 You can then run `wrangler publish` to deploy the bot to Cloudflare Workers. You can then add the bot to your Discord server by going to the OAuth2 tab of your Discord application and copying the URL under "Scopes" and "Bot Permissions" into your browser. You can then select the server you want to add the bot to.
 
