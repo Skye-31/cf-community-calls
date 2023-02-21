@@ -17,14 +17,15 @@ async function sendModalMessage(channelId: string, token: string) {
 			"Content-Type": "application/json",
 		},
 		body: JSON.stringify({
-			content: "Submit Questions Here:",
+			content:
+				"Submit Questions for the Community Call Here\n- General questions should not be sent in this channel, and should instead go in the dedicated channels for this",
 			components: [
 				{
 					type: ComponentType.ActionRow,
 					components: [
 						{
 							type: ComponentType.Button,
-							label: "Ask a question",
+							label: "Send a Community Call Question",
 							style: ButtonStyle.Primary,
 							custom_id: "ask-question",
 							emoji: {
